@@ -12,62 +12,76 @@ app.get("/", (req, res) => {
 });
 
 // =========================== Move to .env ========================
-const client_id = "98f199a472094fb890032932de1bef0e";
-const client_secret = "1c3f809a57b14bc3ac9d5c1a56748e1c";
-const refreshToken =
-  "AQCFzbFWGF04Bs-_zQ4LNJXFV5d6532IE48xlZAFpU6wB93FOWZpnA6MrwYwyU7NhjZwP0OBTwOn6uEc2zouPLJWVkn6BpyHkLfTJmvnbmySxhZrHCzQjrwZSBFim9f2SCc";
+// const client_id = "98f199a472094fb890032932de1bef0e";
+// const client_secret = "1c3f809a57b14bc3ac9d5c1a56748e1c";
+// const refreshToken =
+//   "AQCQUTd7yVjWvoSvi7Gw9e8fqAKhoCWJdZTHYJMhMv1f-IIfyfOW3-Ed_hfAVGwn3szUjyN2dF2Jr4DNCWAfsAYXdE20hK97flnEeRJV4J4OxjJ0q3S38LXoiIyfWFXLUrE";
 // ==================================================================
 
-const getAccessToken = async (client_id, client_secret, refreshToken) => {
-  const basic = new Buffer.from(`${client_id}:${client_secret}`).toString(
+const getAccessToken = async () => {
+  const basic = new Buffer.from(`${process.env.CLIID}:${process.env.CLISECRET}`).toString(
     "base64"
   );
 
   const response = await axios("https://accounts.spotify.com/api/token", {
     method: "post",
+    scope: "user-read-recently-played user-read-currently-playing",
     params: {
       grant_type: "refresh_token",
-      refresh_token: refreshToken,
+      refresh_token: process.env.REFRESH_TOKEN,
     },
-    scope: 'user-read-currently-playing user-read-recently-played', // check tomorrow
     headers: {
       "Content-Type": "application/x-www-form-urlencoded",
       Authorization: `Basic ${basic}`,
-    }
+    },
   });
 
-  console.log(response.data)
   return response.data;
 };
 
-const getRecentlyPlayed = async (access_token) => {
+const getRecentlyPlayed = async () => {
   try {
-
-    const wasPlayingResponse = await axios.get(
-      // Get currently playing song using access token
-      "https://api.spotify.com/v1/me/player/recently-played",
+    const { access_token } = await getAccessToken();
+  
+    const recentlyPlayedResponse = await axios.get(
+      `https://api.spotify.com/v1/me/player/recently-played`,
       {
         headers: {
           Authorization: `Bearer ${access_token}`,
-        }
+        },
+        params: { limit: 1 },
       }
     );
+  
+    const recentlyPlayed = await recentlyPlayedResponse.data.items[0].track;
+    const albumImg = recentlyPlayed.album.images[0].url;
+    const song = recentlyPlayed.name;
+    const artist = recentlyPlayed.artists[0].name;
+    const songUrl = recentlyPlayed.external_urls.spotify;
+    const album = recentlyPlayed.album.name;
 
-    console.log(wasPlayingResponse.data)
+    console.log(song, albumImg, artist, songUrl, album);
+
+    return {
+      song: song,
+      artist: artist,
+      songUrl: songUrl,
+      album: album,
+      albumImg: albumImg,
+      currentlyPlaying: false
+    };
+  
   } catch (error) {
-    console.error("Error fetching currently playing song: ", error);
+    console.error("Error fetching recently played song");
     return error.message.toString();
   }
+
 };
 
 const getNowPlaying = async () => {
   try {
     //Generate an access token
-    const { access_token } = await getAccessToken(
-      client_id,
-      client_secret,
-      refreshToken
-    );
+    const { access_token } = await getAccessToken();
 
     const nowPlayingResponse = await axios.get(
       "https://api.spotify.com/v1/me/player/currently-playing", // Get currently playing song using access token
@@ -82,19 +96,16 @@ const getNowPlaying = async () => {
     );
 
     if (nowPlayingResponse.status > 400) {
-      //If response status > 400 means there was some error while fetching the required information
-      throw new Error(
+      throw new Error( // If response status > 400 means there was some error while fetching the required information
         "Error fetching song error code: ",
         nowPlayingResponse.status
       );
     } else if (nowPlayingResponse.status == 204) {
-      // The response was fetched but there was no content
-        throw new Error('Currently not playing.')
-        getRecentlyPlayed(access_token);
-      // ================== FETCH LAST SONG PLAYED? ===================
-    } 
+      getRecentlyPlayed();
+      // throw new Error("Currently not playing."); // The response was fetched but there was no content
+    } else {
+      // Gather details below (UI data for state)
       const songDetails = await nowPlayingResponse;
-      // console.log(songDetails.data);
       const artist = songDetails.data.item.artists[0].name;
       const song = songDetails.data.item.name;
       const songUrl = songDetails.data.item.external_urls.spotify;
@@ -103,15 +114,29 @@ const getNowPlaying = async () => {
       const isPlaying = songDetails.data.is_playing;
 
       console.log(
-          " Artist: " + artist+"\n", "Song: " + song+"\n", "Album: " + album+"\n", "isPlaying: " + isPlaying
+        " Artist: " + artist + "\n",
+        "Song: " + song + "\n",
+        "SongURL: " + songUrl + "\n",
+        "Album: " + album + "\n",
+        "AlbumImg: " + albumImg + "\n",
+        "isPlaying: " + isPlaying
       );
-    
+
+      return {
+        song: song,
+        artist: artist,
+        songUrl: songUrl,
+        album: album,
+        albumImg: albumImg,
+        currentlyPlaying: isPlaying
+      };
+
+    }
   } catch (error) {
     console.error("Error fetching currently playing song: ", error);
     return error.message.toString();
   }
 };
-
 getNowPlaying();
 
 app.listen("3000", () => {
