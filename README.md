@@ -7,7 +7,7 @@
   <li>CLISECRET</li>
   <li>REFRESH_TOKEN</li>
 </ul>
-Follow [Spotify api](https://developer.spotify.com/documentation/web-api/concepts/authorization) documentation for the Authorization Flow in order to obtain these base values. 
+Follow <a href="https://developer.spotify.com/documentation/web-api/concepts/authorization" target="_blank">Spotify api</a> documentation for the Authorization Flow in order to obtain these base values. 
 Authorization scope required for full functionality<br><br>
 
  
